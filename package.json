@@ -1,0 +1,30 @@
+{
+    "name": "@pavandeep/create-api-setup",
+    "version": "1.0.0",
+    "description": "CLI tool to scaffold API call setup with Axios and Tanstack Query",
+    "main": "index.js",
+    "bin": {
+        "create-api-setup": "./index.js"
+    },
+    "scripts": {
+        "start": "node index.js"
+    },
+    "dependencies": {
+        "@tanstack/react-query": "^5.76.2",
+        "axios": "^1.9.0",
+        "chalk": "^4.1.2",
+        "commander": "^12.1.0",
+        "inquirer": "^11.1.0",
+        "js-cookie": "^3.0.5",
+        "sonner": "^2.0.3"
+    },
+    "keywords": [
+        "cli",
+        "api",
+        "axios",
+        "tanstack-query",
+        "react"
+    ],
+    "author": "Your Name",
+    "license": "MIT"
+}
