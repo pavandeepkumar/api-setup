@@ -7,35 +7,87 @@ const path = require('path');
 const { execSync } = require('child_process');
 const chalk = require('chalk');
 
-// Debug: Log inquirer exports to diagnose the issue
+// Debug: Log inquirer exports to diagnose issues
 console.log(chalk.yellow('Inquirer module exports:'), Object.keys(inquirer));
 
 // Determine the prompt function to use
 const prompt = inquirer.prompt || inquirer.default?.prompt || (() => { throw new Error('Inquirer prompt function not found'); });
 
+async function directoryExists(dirPath) {
+  try {
+    await fs.access(dirPath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function fileExists(filePath) {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 async function setupApiStructure(baseUrl) {
   try {
-    console.log(chalk.blue('Setting up API structure...'));
+    console.log(chalk.blue('Setting up API structure in src directory...'));
 
-    // Define the folder structure
-    const folders = ['config/api', 'config/instance', 'hooks'];
+    // Define the folder structure under src
+    const folders = [
+      'src/config/api',
+      'src/config/instance',
+      'src/hooks',
+      'src/utils'
+    ];
 
-    // Create directories
+    // Check and create directories
     for (const folder of folders) {
       const folderPath = path.join(process.cwd(), folder);
-      try {
-        await fs.mkdir(folderPath, { recursive: true });
-        console.log(chalk.green(`Created directory: ${folderPath}`));
-      } catch (error) {
-        console.error(chalk.red(`Failed to create directory ${folderPath}:`), error.message);
-        throw error;
+      const exists = await directoryExists(folderPath);
+
+      if (exists) {
+        const { action } = await prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: `Directory ${folder} already exists. What would you like to do?`,
+            choices: [
+              { name: 'Skip and continue', value: 'skip' },
+              { name: 'Overwrite (delete and recreate)', value: 'overwrite' },
+              { name: 'Create missing files only', value: 'merge' }
+            ],
+            default: 'merge'
+          }
+        ]);
+
+        if (action === 'skip') {
+          console.log(chalk.yellow(`Skipping directory: ${folderPath}`));
+          continue;
+        } else if (action === 'overwrite') {
+          await fs.rm(folderPath, { recursive: true, force: true });
+          console.log(chalk.yellow(`Removed existing directory: ${folderPath}`));
+        }
+      }
+
+      // Create the directory if it doesn't exist or was overwritten
+      if (!(await directoryExists(folderPath))) {
+        try {
+          await fs.mkdir(folderPath, { recursive: true });
+          console.log(chalk.green(`Created directory: ${folderPath}`));
+        } catch (error) {
+          console.error(chalk.red(`Failed to create directory ${folderPath}:`), error.message);
+          throw error;
+        }
       }
     }
 
     // Define the file contents
     const files = [
       {
-        path: 'config/api/api.ts',
+        path: 'src/config/api/api.ts',
         content: `const API = {
   auth: {
     login: 'auth/login'
@@ -46,9 +98,8 @@ Object.freeze(API);
 export default API;`
       },
       {
-        path: 'config/instance/instance.ts',
-        content: `import useAuthStore from '@/store/useAuthStore';
-import { Result, StorageEnum } from '@/types';
+        path: 'src/config/instance/instance.ts',
+        content: `import { Result, StorageEnum } from '@/types';
 import { setItem } from '@/utils/storage';
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from 'axios';
 import Cookies from 'js-cookie';
@@ -85,7 +136,6 @@ axiosInstance.interceptors.response.use(
     const { response } = error || {};
     const status = response?.status;
     if (status === 401) {
-      useAuthStore.getState().actions.clearUserInfoAndToken();
       setItem(StorageEnum.Token, null);
       window.localStorage.clear();
       Cookies.remove('token');
@@ -132,10 +182,10 @@ class Instance {
 export default new Instance();`
       },
       {
-        path: 'hooks/useFetchData.ts',
-        content: `import instance from '@/api/instance';
+        path: 'src/hooks/useFetchData.ts',
+        content: `import instance from '@/config/instance';
 import { BASIC_AUTH_CREDENTIALS } from '@/constants/data';
-import { buildQueryString } from '@/utils/commonFunction';
+import { buildQueryString } from '@/utils/storage';
 import { useQuery, UseQueryOptions } from '@tanstack/react-query';
 
 const useFetchData = <TData = unknown, TParams = Record<string, unknown>>({
@@ -176,8 +226,8 @@ const useFetchData = <TData = unknown, TParams = Record<string, unknown>>({
 export default useFetchData;`
       },
       {
-        path: 'hooks/usePostData.ts',
-        content: `import instance from '@/api/instance';
+        path: 'src/hooks/usePostData.ts',
+        content: `import instance from '@/config/instance';
 import { useToast } from '@/components/ui/use-toast';
 import {
   useMutation,
@@ -253,8 +303,8 @@ const usePostData = <TData = unknown, TVariables = unknown>({
 export default usePostData;`
       },
       {
-        path: 'hooks/usePutData.ts',
-        content: `import instance from '@/api/instance';
+        path: 'src/hooks/usePutData.ts',
+        content: `import instance from '@/config/instance';
 import {
   UseMutationOptions,
   useMutation,
@@ -316,8 +366,8 @@ const usePutData = <TData = unknown, TVariables = unknown>({
 export default usePutData;`
       },
       {
-        path: 'hooks/usePatchData.ts',
-        content: `import instance from '@/api/instance';
+        path: 'src/hooks/usePatchData.ts',
+        content: `import instance from '@/config/instance';
 import {
   UseMutationOptions,
   useMutation,
@@ -378,8 +428,8 @@ const usePatchData = <TData = unknown, TVariables = unknown>({
 export default usePatchData;`
       },
       {
-        path: 'hooks/useDeleteData.ts',
-        content: `import instance from '@/api/instance';
+        path: 'src/hooks/useDeleteData.ts',
+        content: `import instance from '@/config/instance';
 import {
   UseMutationOptions,
   useMutation,
@@ -430,12 +480,135 @@ const useDeleteData = <TData = unknown>({
 };
 
 export default useDeleteData;`
+      },
+      {
+        path: 'src/utils/storage.ts',
+        content: `import { StorageEnum } from '@/types';
+
+export function buildQueryString(params: Record<string, any>): string {
+  // Ensure params is an object and has keys
+  if (
+    !params ||
+    typeof params !== 'object' ||
+    Object.keys(params).length === 0
+  ) {
+    return '';
+  }
+
+  // Convert each key-value pair to a URL-encoded string
+  const queryString = Object.keys(params)
+    .map((key) => {
+      const value = params[key];
+      if (value === null || value === undefined) {
+        return ''; // Skip null or undefined values
+      }
+      if (Array.isArray(value)) {
+        // Encode array values
+        return value
+          .map((val) => encodeURIComponent(key) + '=' + encodeURIComponent(val))
+          .join('&');
+      }
+      // Encode normal key-value pairs
+      return encodeURIComponent(key) + '=' + encodeURIComponent(value);
+    })
+    .filter((param) => param) // Remove any empty strings
+    .join('&');
+
+  // Prepend '?' if the query string is not empty
+  return queryString ? '?' + queryString : '';
+}
+
+export const getItem = <T>(key: StorageEnum): T | null => {
+  let value = null;
+  try {
+    const result = window.localStorage.getItem(key);
+    if (result) {
+      value = JSON.parse(result);
+    }
+  } catch (error) {
+    console.error(error);
+  }
+  return value;
+};
+
+export const getStringItem = (key: StorageEnum): string | null => {
+  return localStorage.getItem(key);
+};
+
+export const setItem = <T>(key: StorageEnum, value: T): void => {
+  localStorage.setItem(key, JSON.stringify(value));
+};
+
+export const removeItem = (key: StorageEnum): void => {
+  localStorage.removeItem(key);
+};
+
+export const clearItems = () => {
+  localStorage.clear();
+};
+
+export function objectToFormData(
+  obj: Record<string, any>,
+  form?: FormData,
+  namespace?: string
+): FormData {
+  const formData = form || new FormData();
+
+  for (const key in obj) {
+    if (Object.prototype.hasOwnProperty.call(obj, key)) {
+      const value = obj[key];
+      const formKey = namespace ? namespace + '[' + key + ']' : key;
+
+      if (value instanceof File || value instanceof Blob) {
+        // Handle File or Blob
+        formData.append(formKey, value);
+      } else if (typeof value === 'object' && value !== null) {
+        // Recursively process nested objects
+        objectToFormData(value, formData, formKey);
+      } else if (value !== undefined && value !== null) {
+        // Append primitive values (string, number, boolean)
+        formData.append(formKey, String(value));
+      }
+    }
+  }
+
+  return formData;
+}`
       }
     ];
 
-    // Write files
+    // Write files, handling existing files
     for (const file of files) {
       const filePath = path.join(process.cwd(), file.path);
+      const dirPath = path.dirname(filePath);
+
+      // Skip if the directory was skipped
+      if (!(await directoryExists(dirPath))) {
+        console.log(chalk.yellow(`Skipping file ${filePath} as directory was skipped`));
+        continue;
+      }
+
+      const exists = await fileExists(filePath);
+      if (exists) {
+        const { action } = await prompt([
+          {
+            type: 'list',
+            name: 'action',
+            message: `File ${file.path} already exists. What would you like to do?`,
+            choices: [
+              { name: 'Skip', value: 'skip' },
+              { name: 'Overwrite', value: 'overwrite' }
+            ],
+            default: 'skip'
+          }
+        ]);
+
+        if (action === 'skip') {
+          console.log(chalk.yellow(`Skipping file: ${filePath}`));
+          continue;
+        }
+      }
+
       try {
         await fs.writeFile(filePath, file.content, 'utf-8');
         console.log(chalk.green(`Created file: ${filePath}`));
@@ -460,16 +633,13 @@ export default useDeleteData;`
 
     console.log(chalk.green('API setup completed successfully!'));
     console.log(chalk.yellow('Note: Ensure you have the following utilities in your project:'));
-    console.log(chalk.yellow('- useAuthStore (from "@/store/useAuthStore")'));
     console.log(chalk.yellow('- StorageEnum and Result (from "@/types")'));
-    console.log(chalk.yellow('- setItem (from "@/utils/storage")'));
-    console.log(chalk.yellow('- buildQueryString (from "@/utils/commonFunction")'));
     console.log(chalk.yellow('- useToast (from "@/components/ui/use-toast")'));
     console.log(chalk.yellow('- BASIC_AUTH_CREDENTIALS (from "@/constants/data")'));
     console.log(chalk.cyan('You may need to implement these utilities or remove their references if not needed.'));
   } catch (error) {
     console.error(chalk.red('Error setting up API structure:'), error.message);
-    process.exit(1);
+    throw error;
   }
 }
 
@@ -494,7 +664,7 @@ program
           type: 'input',
           name: 'baseUrl',
           message: 'Enter the API base URL:',
-          default: 'https://example.com/api/v1',
+          default: 'https://pumpup-api.devstree.in/api/v1',
           validate: (input) => {
             if (!input.trim()) return 'API base URL cannot be empty';
             try {

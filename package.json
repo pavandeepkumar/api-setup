@@ -1,10 +1,10 @@
 {
     "name": "@pavandeep/create-api-setup",
-    "version": "1.0.0",
+    "version": "1.0.2",
     "description": "CLI tool to scaffold API call setup with Axios and Tanstack Query",
     "main": "index.js",
     "bin": {
-        "create-api-setup": "./index.js"
+        "@pavandeep/create-api-setup": "./index.js"
     },
     "scripts": {
         "start": "node index.js"
@@ -14,7 +14,7 @@
         "axios": "^1.9.0",
         "chalk": "^4.1.2",
         "commander": "^12.1.0",
-        "inquirer": "^11.1.0",
+        "inquirer": "^8.2.4",
         "js-cookie": "^3.0.5",
         "sonner": "^2.0.3"
     },
@@ -25,6 +25,13 @@
         "tanstack-query",
         "react"
     ],
-    "author": "Your Name",
-    "license": "MIT"
+    "author": "Pavandeep <pavandeepkumarmlk@gmail.com>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/pavandeep/create-api-setup.git"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
 }
